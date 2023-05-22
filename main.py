@@ -108,7 +108,7 @@ def main(prompt, directory=generatedDir):
         with open(prompt, "r") as promptfile:
             prompt = promptfile.read()
 
-    print("hi its me, 🐣the smol developer🐣! you said you wanted:")
+    print("=== ai-intern ===")
     print("\033[92m" + prompt + "\033[0m")
     print('\n')
 
