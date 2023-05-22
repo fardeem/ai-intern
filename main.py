@@ -8,12 +8,13 @@ generatedDir = "generated"
 openai_image = modal.Image.debian_slim().pip_install("openai", "tiktoken")
 openai_model = "gpt-4"  # or 'gpt-3.5-turbo',
 openai_model_max_tokens = 2000  # i wonder how to tweak this properly
-report_token_count = False
 
 
 @stub.function(
     image=openai_image,
-    secret=modal.Secret.from_dotenv(),
+    secret=modal.Secret.from_dotenv(
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), ".env")
+    ),
     retries=modal.Retries(
         max_retries=3,
         backoff_coefficient=2.0,
@@ -23,30 +24,17 @@ report_token_count = False
 )
 def generate_response(system_prompt, user_prompt, *args):
     import openai
-    import tiktoken
-
-    def reportTokens(prompt):
-        if not report_token_count:
-            return
-
-        encoding = tiktoken.encoding_for_model(openai_model)
-        # print number of tokens in light gray, with first 10 characters of prompt in green
-        print("\033[37m" + str(len(encoding.encode(prompt))) + " tokens\033[0m" +
-              " in prompt: " + "\033[92m" + prompt[:50] + "\033[0m")
 
     # Set up your OpenAI API credentials
     openai.api_key = os.environ["OPENAI_API_KEY"]
 
     messages = []
     messages.append({"role": "system", "content": system_prompt})
-    reportTokens(system_prompt)
     messages.append({"role": "user", "content": user_prompt})
-    reportTokens(user_prompt)
-    # loop thru each arg and add it to messages alternating role between "assistant" and "user"
+
     role = "assistant"
     for value in args:
         messages.append({"role": role, "content": value})
-        reportTokens(value)
         role = "user" if role == "assistant" else "assistant"
 
     params = {
@@ -61,7 +49,10 @@ def generate_response(system_prompt, user_prompt, *args):
 
     # Get the reply from the API response
     reply = response.choices[0]["message"]["content"]  # type: ignore
-    return reply
+
+    total_cost = calculate_cost(system_prompt + user_prompt, reply)
+
+    return reply, total_cost
 
 
 @stub.function()
@@ -103,126 +94,127 @@ def generate_file(filename, filepaths_string=None, shared_dependencies=None, pro
 
     """
 
-    filecode = generate_response.call(
+    filecode, cost = generate_response.call(
         system_prompt,
         user_prompt
     )
 
-    return filename, filecode, system_prompt, user_prompt
+    return filename, filecode, cost
 
 
 @stub.local_entrypoint()
 def main(prompt, directory=generatedDir):
-    print("directory", directory)
-
-    return
-    # read file from prompt if it ends in a .md filetype
     if prompt.endswith(".md"):
         with open(prompt, "r") as promptfile:
             prompt = promptfile.read()
 
     print("hi its me, 🐣the smol developer🐣! you said you wanted:")
-    # print the prompt in green color
     print("\033[92m" + prompt + "\033[0m")
-
     print('\n')
 
-    clean_dir(directory)
-
+    total_cost = 0
     log_file_path = directory + "/logs.md"
 
+    # Clean directory
+    clean_dir(directory)
+
+    # Generate filepaths
     print("Generating filepaths...")
 
-    # call openai api with this prompt
-    filepaths_string = generate_response.call(
+    filepaths_string, cost = generate_response.call(
         """
     You are an AI developer who is trying to write a program that will generate code for the user based on their intent.
-    
+
     When given their intent, create a complete, exhaustive list of filepaths that the user would write to make the program.
 
-    only list the filepaths you would write, and return them as a python list of strings. 
-    
+    only list the filepaths you would write, and return them as a python list of strings.
+
     do not add any other explanation, only return a python list of strings.
     """,
         prompt,
     )
 
+    total_cost += cost
+    print(filepaths_string)
+    print_cost("Generating filepaths", cost)
     log(
         log_file_path=log_file_path,
-        text=f"**Generating filepaths:**\n{filepaths_string}"
+        text=f"**Generating filepaths:**\n{filepaths_string}\nCost: {cost}"
     )
+    print("\n")
 
-    # parse the result into a python list
+    # Parse filepaths
     list_actual = []
     try:
         list_actual = ast.literal_eval(filepaths_string)
+    except ValueError:
+        print("Failed to parse result: " + filepaths_string)
+        return
 
-        # if shared_dependencies.md is there, read it in, else set it to None
-        shared_dependencies = None
-        if os.path.exists("shared_dependencies.md"):
-            with open("shared_dependencies.md", "r") as shared_dependencies_file:
-                shared_dependencies = shared_dependencies_file.read()
+    # if shared_dependencies.md is there, read it in, else set it to None
+    shared_dependencies = None
+    if os.path.exists("shared_dependencies.md"):
+        with open("shared_dependencies.md", "r") as shared_dependencies_file:
+            shared_dependencies = shared_dependencies_file.read()
 
-        print('Figuring out shared dependencies...')
-        # understand shared dependencies
-        shared_dependencies = generate_response.call(
-            """
-        You are an AI developer who is trying to write a program that will generate code for the user based on their intent.
-            
-        In response to the user's prompt:
-
-        ---
-        the app is: {prompt}
-        ---
+    print('Figuring out shared dependencies...')
+    # understand shared dependencies
+    shared_dependencies, cost = generate_response.call(
+        """
+    You are an AI developer who is trying to write a program that will generate code for the user based on their intent.
         
-        the files we have decided to generate are: {filepaths_string}
+    In response to the user's prompt:
 
-        Now that we have a list of files, we need to understand what dependencies they share.
-        Please name and briefly describe what is shared between the files we are generating, including exported variables, data schemas, id names of every DOM elements that javascript functions will use, message names, and function names.
-        Exclusively focus on the names of the shared dependencies, and do not add any other explanation.
-        """,
-            prompt,
+    ---
+    the app is: {prompt}
+    ---
+    
+    the files we have decided to generate are: {filepaths_string}
+
+    Now that we have a list of files, we need to understand what dependencies they share.
+    Please name and briefly describe what is shared between the files we are generating, including exported variables, data schemas, id names of every DOM elements that javascript functions will use, message names, and function names.
+    Exclusively focus on the names of the shared dependencies, and do not add any other explanation.
+    """,
+        prompt,
+    )
+
+    total_cost += cost
+    print_cost("Shared dependencies cost", cost)
+    write_file("shared_dependencies.md", shared_dependencies, directory)
+    log(
+        log_file_path=log_file_path,
+        text=f"**Generating shared dependencies:**\n{shared_dependencies}"
+    )
+    print("\n")
+
+    # Generating code
+    print('Generating code for each file...')
+    for filename, filecode, cost in generate_file.map(
+        list_actual, order_outputs=False, kwargs=dict(filepaths_string=filepaths_string, shared_dependencies=shared_dependencies, prompt=prompt)
+    ):
+        total_cost += cost
+        print_cost(f"Generating {filename}", cost)
+
+        write_file(
+            filename,
+            filecode,
+            directory,
         )
-
-        write_file("shared_dependencies.md",
-                   shared_dependencies, directory)
 
         log(
             log_file_path=log_file_path,
-            text=f"**Generating shared dependencies:**\n{shared_dependencies}"
+            text=f"**Generating code for filename:** {filename}\n\nCode:\n{filecode}\n\nCost: {cost}"
         )
 
-        print('Generating code for each file...')
+        print("\n")
 
-        for filename, filecode, system_prompt, user_prompt in generate_file.map(
-            list_actual, order_outputs=False, kwargs=dict(filepaths_string=filepaths_string, shared_dependencies=shared_dependencies, prompt=prompt)
-        ):
-            write_file(
-                filename,
-                filecode,
-                directory,
-            )
-
-            log(
-                log_file_path=log_file_path,
-                text=f"""
-**Generating code for filename:** {filename}
-System prompt:
-{system_prompt}
-User Prompt:
-{user_prompt}
-Code:
-{filecode}
-                """
-            )
-
-    except ValueError:
-        print("Failed to parse result: " + filepaths_string)
+    print_cost("Total cost", total_cost)
+    log(log_file_path=log_file_path, text=f"**Total cost:** {total_cost}")
 
 
 def write_file(filename, filecode, directory):
     # Output the filename in blue color
-    print("\033[94m" + filename + "\033[0m")
+    print("\033[94m" + f"writing: {filename}" + "\033[0m")
 
     file_path = directory + "/" + filename
     dir = os.path.dirname(file_path)
@@ -235,12 +227,10 @@ def write_file(filename, filecode, directory):
 
 
 def clean_dir(directory):
-    extensions_to_skip = ['.png', '.jpg', '.jpeg', '.gif', '.bmp',
-                          '.svg', '.ico', '.tif', '.tiff']  # Add more extensions if needed
+    extensions_to_skip = ['.png', '.jpg', '.jpeg',
+                          '.gif', '.bmp', '.svg', '.ico', '.tif', '.tiff']
 
-    # Check if the directory exists
     if os.path.exists(directory):
-        # If it does, iterate over all files and directories
         for root, dirs, files in os.walk(directory):
             for file in files:
                 _, extension = os.path.splitext(file)
@@ -257,3 +247,25 @@ def clean_dir(directory):
 def log(log_file_path, text):
     with open(log_file_path, "a") as log_file:
         log_file.write(text + "\n\n\n")
+
+
+def calculate_cost(prompt, response):
+    import tiktoken
+
+    encoding = tiktoken.encoding_for_model(openai_model)
+
+    prompt_token = len(encoding.encode(prompt))
+    response_token = len(encoding.encode(response))
+
+    prompt_cost_rate_per_1000 = 0.03
+    response_cost_rate_per_1000 = 0.06
+
+    prompt_cost = prompt_token / 1000 * prompt_cost_rate_per_1000
+    response_cost = response_token / 1000 * response_cost_rate_per_1000
+    total_cost = prompt_cost + response_cost
+
+    return total_cost
+
+
+def print_cost(reason: str, cost: str):
+    print("\033[93m" + f"Cost of {reason}: {cost}" + "\033[0m")
