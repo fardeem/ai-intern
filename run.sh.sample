@@ -2,4 +2,10 @@
 
 current_directory=$(pwd)
 
-modal run <directory of>main.py "$@" --directory "${current_directory}"
+# Store the first argument in a variable
+operation_type="$1"
+
+# Remove the first argument from the list
+shift
+
+modal run <directory>/main.py --command "${operation_type}" --directory "${current_directory}" "$@"

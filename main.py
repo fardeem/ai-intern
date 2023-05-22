@@ -10,6 +10,67 @@ openai_model = "gpt-4"  # or 'gpt-3.5-turbo',
 openai_model_max_tokens = 2000  # i wonder how to tweak this properly
 
 
+def write_file(filename, filecode, directory):
+    # Output the filename in blue color
+    print("\033[94m" + f"writing: {filename}" + "\033[0m")
+
+    file_path = directory + "/" + filename
+    dir = os.path.dirname(file_path)
+    os.makedirs(dir, exist_ok=True)
+
+    # Open the file in write mode
+    with open(file_path, "w") as file:
+        # Write content to the file
+        file.write(filecode)
+
+
+def clean_dir(directory):
+    print("Cleaning directory:", os.getcwd())
+
+    extensions_to_skip = ['.png', '.jpg', '.jpeg',
+                          '.gif', '.bmp', '.svg', '.ico', '.tif', '.tiff']
+
+    if os.path.exists(directory):
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                _, extension = os.path.splitext(file)
+                if extension not in extensions_to_skip:
+                    os.remove(os.path.join(root, file))
+
+            for dir in dirs:
+                clean_dir(os.path.join(root, dir))
+                os.rmdir(os.path.join(root, dir))
+    else:
+        os.makedirs(directory, exist_ok=True)
+
+
+def log(log_file_path, text):
+    with open(log_file_path, "a") as log_file:
+        log_file.write(text + "\n\n\n")
+
+
+def calculate_cost(prompt, response):
+    import tiktoken
+
+    encoding = tiktoken.encoding_for_model(openai_model)
+
+    prompt_token = len(encoding.encode(prompt))
+    response_token = len(encoding.encode(response))
+
+    prompt_cost_rate_per_1000 = 0.03
+    response_cost_rate_per_1000 = 0.06
+
+    prompt_cost = prompt_token / 1000 * prompt_cost_rate_per_1000
+    response_cost = response_token / 1000 * response_cost_rate_per_1000
+    total_cost = prompt_cost + response_cost
+
+    return total_cost
+
+
+def print_cost(reason: str, cost: str):
+    print("\033[93m" + f"Cost of {reason}: {cost}" + "\033[0m")
+
+
 @stub.function(
     image=openai_image,
     secret=modal.Secret.from_dotenv(
@@ -102,12 +163,8 @@ def generate_file(filename, filepaths_string=None, shared_dependencies=None, pro
     return filename, filecode, cost
 
 
-@stub.local_entrypoint()
-def main(prompt, directory=generatedDir):
-    if prompt.endswith(".md"):
-        with open(prompt, "r") as promptfile:
-            prompt = promptfile.read()
-
+@stub.function()
+def generate(prompt: str, directory: str = generatedDir):
     print("=== ai-intern ===")
     print("\033[92m" + prompt + "\033[0m")
     print('\n')
@@ -212,62 +269,13 @@ def main(prompt, directory=generatedDir):
     log(log_file_path=log_file_path, text=f"**Total cost:** {total_cost}")
 
 
-def write_file(filename, filecode, directory):
-    # Output the filename in blue color
-    print("\033[94m" + f"writing: {filename}" + "\033[0m")
+@stub.local_entrypoint()
+def main(command, prompt, directory=generatedDir):
+    if prompt.endswith(".md"):
+        with open(prompt, "r") as promptfile:
+            prompt = promptfile.read()
 
-    file_path = directory + "/" + filename
-    dir = os.path.dirname(file_path)
-    os.makedirs(dir, exist_ok=True)
-
-    # Open the file in write mode
-    with open(file_path, "w") as file:
-        # Write content to the file
-        file.write(filecode)
-
-
-def clean_dir(directory):
-    print("Cleaning directory:", os.getcwd())
-
-    extensions_to_skip = ['.png', '.jpg', '.jpeg',
-                          '.gif', '.bmp', '.svg', '.ico', '.tif', '.tiff']
-
-    if os.path.exists(directory):
-        for root, dirs, files in os.walk(directory):
-            for file in files:
-                _, extension = os.path.splitext(file)
-                if extension not in extensions_to_skip:
-                    os.remove(os.path.join(root, file))
-
-            for dir in dirs:
-                clean_dir(os.path.join(root, dir))
-                os.rmdir(os.path.join(root, dir))
+    if command == "generate":
+        generate(prompt, directory)
     else:
-        os.makedirs(directory, exist_ok=True)
-
-
-def log(log_file_path, text):
-    with open(log_file_path, "a") as log_file:
-        log_file.write(text + "\n\n\n")
-
-
-def calculate_cost(prompt, response):
-    import tiktoken
-
-    encoding = tiktoken.encoding_for_model(openai_model)
-
-    prompt_token = len(encoding.encode(prompt))
-    response_token = len(encoding.encode(response))
-
-    prompt_cost_rate_per_1000 = 0.03
-    response_cost_rate_per_1000 = 0.06
-
-    prompt_cost = prompt_token / 1000 * prompt_cost_rate_per_1000
-    response_cost = response_token / 1000 * response_cost_rate_per_1000
-    total_cost = prompt_cost + response_cost
-
-    return total_cost
-
-
-def print_cost(reason: str, cost: str):
-    print("\033[93m" + f"Cost of {reason}: {cost}" + "\033[0m")
+        print("Invalid command:", command)
