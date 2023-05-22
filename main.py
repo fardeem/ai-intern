@@ -208,7 +208,7 @@ def main(prompt, directory=generatedDir):
 
         print("\n")
 
-    print_cost("Total cost", total_cost)
+    print_cost("Total app", total_cost)
     log(log_file_path=log_file_path, text=f"**Total cost:** {total_cost}")
 
 
