@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+current_directory=$(pwd)
+
+modal run <directory of>main.py "$@" --directory "${current_directory}"

@@ -1,0 +1,1 @@
+a flask app that serves a react frontend powered by create-react-app and also includes authentication. The react app should have a login form and a page that is only accessible when you login in. Include a readme on how to install all depedencies and run the project.
