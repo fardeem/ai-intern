@@ -227,6 +227,8 @@ def write_file(filename, filecode, directory):
 
 
 def clean_dir(directory):
+    print("Cleaning directory:", os.getcwd())
+
     extensions_to_skip = ['.png', '.jpg', '.jpeg',
                           '.gif', '.bmp', '.svg', '.ico', '.tif', '.tiff']
 
