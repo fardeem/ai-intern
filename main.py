@@ -25,7 +25,9 @@ def write_file(filename, filecode, directory):
 
 
 def clean_dir(directory):
-    print("Cleaning directory:", os.getcwd())
+    print("Cleaning directory:", directory)
+
+    return
 
     extensions_to_skip = ['.png', '.jpg', '.jpeg',
                           '.gif', '.bmp', '.svg', '.ico', '.tif', '.tiff']
@@ -44,7 +46,10 @@ def clean_dir(directory):
         os.makedirs(directory, exist_ok=True)
 
 
-def log(log_file_path, text):
+def log(log_file_path: str, text: str, should_log: bool):
+    if not should_log:
+        return
+
     with open(log_file_path, "a") as log_file:
         log_file.write(text + "\n\n\n")
 
@@ -164,7 +169,7 @@ def generate_file(filename, filepaths_string=None, shared_dependencies=None, pro
 
 
 @stub.function()
-def generate(prompt: str, directory: str = generatedDir):
+def generate(prompt: str, should_log: bool, directory: str = generatedDir):
     print("=== ai-intern ===")
     print("\033[92m" + prompt + "\033[0m")
     print('\n')
@@ -196,7 +201,8 @@ def generate(prompt: str, directory: str = generatedDir):
     print_cost("Generating filepaths", cost)
     log(
         log_file_path=log_file_path,
-        text=f"**Generating filepaths:**\n{filepaths_string}\nCost: {cost}"
+        text=f"**Generating filepaths:**\n{filepaths_string}\nCost: {cost}",
+        should_log=should_log,
     )
     print("\n")
 
@@ -240,7 +246,8 @@ def generate(prompt: str, directory: str = generatedDir):
     write_file("shared_dependencies.md", shared_dependencies, directory)
     log(
         log_file_path=log_file_path,
-        text=f"**Generating shared dependencies:**\n{shared_dependencies}"
+        text=f"**Generating shared dependencies:**\n{shared_dependencies}",
+        should_log=should_log,
     )
     print("\n")
 
@@ -260,22 +267,26 @@ def generate(prompt: str, directory: str = generatedDir):
 
         log(
             log_file_path=log_file_path,
-            text=f"**Generating code for filename:** {filename}\n\nCode:\n{filecode}\n\nCost: {cost}"
+            text=f"**Generating code for filename:** {filename}\n\nCode:\n{filecode}\n\nCost: {cost}",
+            should_log=should_log,
         )
 
         print("\n")
 
     print_cost("Total app", total_cost)
-    log(log_file_path=log_file_path, text=f"**Total cost:** {total_cost}")
+    log(
+        log_file_path=log_file_path,
+        text=f"**Total cost:** {total_cost}",
+        should_log=should_log)
 
 
 @stub.local_entrypoint()
-def main(command, prompt, directory=generatedDir):
+def main(command, prompt, logging=False, directory=generatedDir):
     if prompt.endswith(".md"):
         with open(prompt, "r") as promptfile:
             prompt = promptfile.read()
 
     if command == "generate":
-        generate(prompt, directory)
+        generate(prompt=prompt, directory=directory, should_log=logging)
     else:
         print("Invalid command:", command)
