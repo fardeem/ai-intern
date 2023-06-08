@@ -302,12 +302,9 @@ def generate(prompt: str, should_log: bool, directory: str = generatedDir):
 
 
 @stub.local_entrypoint()
-def main(command, prompt, logging=False, directory=generatedDir):
+def main(prompt, logging=False, directory=generatedDir):
     if prompt.endswith(".md"):
         with open(prompt, "r") as promptfile:
             prompt = promptfile.read()
 
-    if command == "generate":
-        generate(prompt=prompt, directory=directory, should_log=logging)
-    else:
-        print("Invalid command:", command)
+    generate(prompt=prompt, directory=directory, should_log=logging)
