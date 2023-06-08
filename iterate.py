@@ -15,11 +15,13 @@ openai_image = modal.Image.debian_slim().pip_install("openai")
 
 DEFAULT_DIR = "generated"
 
-SYSTEM_PROMPT = """
+ITERATE_SYSTEM_PROMPT = """
 You are an AI debugger who is trying to debug a program for a user based on their file system. The user has provided you with the following files and their contents, finally folllowed by the error message or issue they are facing.
 """
 
-def USER_PROMPT(context: str, prompt: str): return f"""
+
+
+def ITERATE_USER_PROMPT(context: str, prompt: str): return f"""
 My files are as follows:
 {context}
 
@@ -29,6 +31,19 @@ My issue is as follows:
 Give me ideas for what could be wrong and what fixes to do in which files.
 """
 
+EXPLAIN_SYSTEM_PROMPT = """
+You are an expert AI software engineer who is trying to answer questions about a codebase for a user based on their file system. The user has provided you with the following files and their contents, finally followed by the question they have.
+"""
+
+def EXPLAIN_USER_PROMPT(context: str, prompt: str): return f"""
+My files are as follows:
+{context}
+
+My question is as follows:
+{prompt}
+
+Give me answers to my question.
+"""
 
 @stub.function(
     image=openai_image,
@@ -77,7 +92,7 @@ def generate_response(system_prompt, user_prompt, model="gpt-4", *args):
 
 
 @stub.local_entrypoint()
-def main(prompt, directory=DEFAULT_DIR):
+def main(prompt, variation, directory=DEFAULT_DIR):
   print('== ai-intern ==')
   
   code_contents = walk_directory(directory)
@@ -85,12 +100,18 @@ def main(prompt, directory=DEFAULT_DIR):
 
   context = "\n".join(f"{path}:\n{contents}" for path, contents in code_contents.items())
 
-  user_prompt = USER_PROMPT(
+
+  user_prompt = ITERATE_USER_PROMPT(
+    context=context,
+    prompt=prompt,
+  ) if variation == "iterate" else EXPLAIN_USER_PROMPT(
     context=context,
     prompt=prompt,
   )
+
+  system_prompt = ITERATE_SYSTEM_PROMPT if variation == "iterate" else EXPLAIN_SYSTEM_PROMPT
   
-  res = generate_response.call(SYSTEM_PROMPT, user_prompt)
+  res = generate_response.call(system_prompt, user_prompt)
   
   print("\033[96m" + res + "\033[0m")
 
