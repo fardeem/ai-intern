@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 current_directory=$(pwd)
+dev_directory=<>
 
 # Store the first argument in a variable
 operation_type="$1"
@@ -8,4 +9,11 @@ operation_type="$1"
 # Remove the first argument from the list
 shift
 
-modal run <directory>/main.py --command "${operation_type}" --directory "${current_directory}" "$@"
+if [ "$operation_type" == "generate" ]; then
+    modal run ${dev_directory}/main.py --directory "${current_directory}" "$@"
+elif [ "$operation_type" == "iterate" ]; then
+    modal run ${dev_directory}/iterate.py --directory "${current_directory}" "$@"
+else
+    echo "Error: invalid operation type. Choose either 'generate' or 'iterate'."
+    exit 1
+fi
