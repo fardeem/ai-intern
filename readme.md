@@ -13,7 +13,7 @@ modal token new
 modal run main.py --prompt flask.md
 ```
 
-To run on any directory, copy and edit `run.sh.sample` and rename to `run.sh`. Then,
+To run on any directory, run,
 
 ```bash
 sudo ln -s <directory>/ai-intern/run.sh /usr/local/bin/ai-intern

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 current_directory=$(pwd)
-dev_directory=<>
+dev_directory="$(dirname "$(readlink -f "$0")")"
 
 # Store the first argument in a variable
 operation_type="$1"
