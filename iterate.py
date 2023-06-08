@@ -1,15 +1,18 @@
 import os
+import pathlib
+import sys
 
 import modal
+
+script_path = pathlib.Path(os.path.realpath(__file__)).parent
+sys.path.append(str(script_path))
+
+from utils import walk_directory
 
 stub = modal.Stub("ai-intern")
 openai_image = modal.Image.debian_slim().pip_install("openai")
 
-EXTENSION_TO_SKIP = [
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".ico", ".tif", ".tiff",
-    "yarn.lock", "package-lock.json", "node_modules", ".git", 'logs.md'
-]
-EXCLUDED_DIRS = ['node_modules', '.git']
+
 DEFAULT_DIR = "generated"
 
 SYSTEM_PROMPT = """
@@ -27,31 +30,11 @@ Give me ideas for what could be wrong and what fixes to do in which files.
 """
 
 
-def read_file(filename):
-    with open(filename, 'r') as file:
-        return file.read()
-
-def walk_directory(directory):
-    code_contents = {}
-    for dirpath, dirnames, filenames in os.walk(directory):
-        for exclude_dir in EXCLUDED_DIRS:
-          if exclude_dir in dirnames:
-              dirnames.remove(exclude_dir)
-      
-        for filename in filenames:
-            if not any(filename.endswith(ext) for ext in EXTENSION_TO_SKIP):
-                try:
-                    relative_filepath = os.path.relpath(os.path.join(dirpath, filename), directory)
-                    code_contents[relative_filepath] = read_file(os.path.join(dirpath, filename))
-                except Exception as e:
-                    code_contents[relative_filepath] = f"Error reading file {filename}: {str(e)}"  # type: ignore
-    return code_contents
-
-
-
 @stub.function(
     image=openai_image,
-    secret=modal.Secret.from_dotenv(),
+    secret=modal.Secret.from_dotenv(
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), ".env")
+    ),
     retries=modal.Retries(
         max_retries=3,
         backoff_coefficient=2.0,
@@ -70,7 +53,7 @@ def generate_response(system_prompt, user_prompt, model="gpt-4", *args):
     messages = []
     messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": user_prompt})
-    # loop thru each arg and add it to messages alternating role between "assistant" and "user"
+
     role = "assistant"
     for value in args:
         messages.append({"role": role, "content": value})
@@ -78,7 +61,6 @@ def generate_response(system_prompt, user_prompt, model="gpt-4", *args):
 
     params = {
         'model': model,
-        # "model": "gpt-4",
         "messages": messages,
         "max_tokens": 1500,
         "temperature": 0,
