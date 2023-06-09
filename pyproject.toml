@@ -9,6 +9,7 @@ python = "^3.9"
 modal-client = "^0.49.2348"
 tiktoken = "^0.4.0"
 openai = "^0.27.8"
+autopep8 = "^2.0.2"
 
 [tool.poetry.dev-dependencies]
 
