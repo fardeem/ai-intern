@@ -5,9 +5,8 @@ import sys
 
 import modal
 
-script_path = pathlib.Path(os.path.realpath(__file__)).parent
-sys.path.append(str(script_path))
-
+script_path = pathlib.Path(os.path.realpath(__file__)).parent  # noqa
+sys.path.append(str(script_path))  # noqa
 from generate_prompts import (GENERATE_FILE_STRINGS_SYSTEM_PROMPT,
                               GENERATE_FILE_SYSTEM_PROMPT,
                               GENERATE_FILE_USER_PROMPT,

@@ -4,10 +4,10 @@ import sys
 
 import modal
 
-script_path = pathlib.Path(os.path.realpath(__file__)).parent
-sys.path.append(str(script_path))
+script_path = pathlib.Path(os.path.realpath(__file__)).parent  # noqa
+sys.path.append(str(script_path))  # noqa
 
-from utils import walk_directory
+from utils import print_wrapped, walk_directory
 
 stub = modal.Stub("ai-intern")
 openai_image = modal.Image.debian_slim().pip_install("openai")
@@ -20,7 +20,6 @@ You are an AI debugger who is trying to debug a program for a user based on thei
 """
 
 
-
 def ITERATE_USER_PROMPT(context: str, prompt: str): return f"""
 My files are as follows:
 {context}
@@ -31,9 +30,11 @@ My issue is as follows:
 Give me ideas for what could be wrong and what fixes to do in which files.
 """
 
+
 EXPLAIN_SYSTEM_PROMPT = """
 You are an expert AI software engineer who is trying to answer questions about a codebase for a user based on their file system. The user has provided you with the following files and their contents, finally followed by the question they have.
 """
+
 
 def EXPLAIN_USER_PROMPT(context: str, prompt: str): return f"""
 My files are as follows:
@@ -44,6 +45,7 @@ My question is as follows:
 
 Give me answers to my question.
 """
+
 
 @stub.function(
     image=openai_image,
@@ -85,34 +87,29 @@ def generate_response(system_prompt, user_prompt, model="gpt-4", *args):
     response = openai.ChatCompletion.create(**params)
 
     # Get the reply from the API response
-    reply = response.choices[0]["message"]["content"] # type: ignore 
+    reply = response.choices[0]["message"]["content"]  # type: ignore
     return reply
-
-
 
 
 @stub.local_entrypoint()
 def main(prompt, variation, directory=DEFAULT_DIR):
-  print('== ai-intern ==')
-  
-  code_contents = walk_directory(directory)
+    print('== ai-intern ==')
 
+    code_contents = walk_directory(directory)
 
-  context = "\n".join(f"{path}:\n{contents}" for path, contents in code_contents.items())
+    context = "\n".join(f"{path}:\n{contents}" for path,
+                        contents in code_contents.items())
 
+    user_prompt = ITERATE_USER_PROMPT(
+        context=context,
+        prompt=prompt,
+    ) if variation == "iterate" else EXPLAIN_USER_PROMPT(
+        context=context,
+        prompt=prompt,
+    )
 
-  user_prompt = ITERATE_USER_PROMPT(
-    context=context,
-    prompt=prompt,
-  ) if variation == "iterate" else EXPLAIN_USER_PROMPT(
-    context=context,
-    prompt=prompt,
-  )
+    system_prompt = ITERATE_SYSTEM_PROMPT if variation == "iterate" else EXPLAIN_SYSTEM_PROMPT
 
-  system_prompt = ITERATE_SYSTEM_PROMPT if variation == "iterate" else EXPLAIN_SYSTEM_PROMPT
-  
-  res = generate_response.call(system_prompt, user_prompt)
-  
-  print("\033[96m" + res + "\033[0m")
+    res = generate_response.call(system_prompt, user_prompt)
 
-
+    print_wrapped("\033[96m" + res + "\033[0m")
