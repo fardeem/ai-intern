@@ -3,9 +3,9 @@ import textwrap
 
 EXTENSION_TO_SKIP = [
     ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".ico", ".tif", ".tiff",
-    "yarn.lock", "package-lock.json", "node_modules", ".git", 'logs.md'
+    "yarn.lock", "package-lock.json", "node_modules", ".git", 'logs.md',
 ]
-EXCLUDED_DIRS = ['node_modules', '.git']
+EXCLUDED_DIRS = ['node_modules', '.git', '.next']
 
 
 def read_file(filename):

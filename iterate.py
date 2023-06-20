@@ -60,7 +60,7 @@ Give me answers to my question.
     concurrency_limit=5,
     timeout=120,
 )
-def generate_response(system_prompt, user_prompt, model="gpt-4", *args):
+def generate_response(system_prompt, user_prompt, model="gpt-3.5-turbo-16k", *args):
     import openai
 
     # print(os.environ["OPENAI_API_KEY"])
@@ -97,6 +97,11 @@ def main(prompt, variation, directory=DEFAULT_DIR):
 
     code_contents = walk_directory(directory)
 
+    print(
+        'Found the following files in the directory you specified: \n',
+        '\n'.join(code_contents.keys()),
+    )
+
     context = "\n".join(f"{path}:\n{contents}" for path,
                         contents in code_contents.items())
 
@@ -112,4 +117,4 @@ def main(prompt, variation, directory=DEFAULT_DIR):
 
     res = generate_response.call(system_prompt, user_prompt)
 
-    print_wrapped("\033[96m" + res + "\033[0m")
+    print("\033[96m" + res + "\033[0m")
